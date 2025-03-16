@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "556426016827",
+    "project_id": "traffix-flutter",
+    "storage_bucket": "traffix-flutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:556426016827:android:c35e7559976cd5e88cc41e",
+        "android_client_info": {
+          "package_name": "com.example.traffix"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1vh1Xt3jRKPdMvcoH-GBqNgs9zPYHUvA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
