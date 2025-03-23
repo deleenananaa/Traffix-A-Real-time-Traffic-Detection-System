@@ -13,6 +13,31 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   final user = FirebaseAuth.instance.currentUser;
+  // Add this variable to track selected index
+  int _selectedIndex = 0;
+
+  // Add this method to handle navigation
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    switch (index) {
+      case 0: // Home
+        Navigator.pushReplacementNamed(context, '/homepage');
+        break;
+      case 1: // Routes
+        Navigator.pushReplacementNamed(context, '/routespage');
+        break;
+      case 2: // Alerts
+        Navigator.pushReplacementNamed(context, '/alertspage');
+        break;
+      case 3: // Emergency
+        Navigator.pushReplacementNamed(context, '/emergencypage');
+        break;
+    }
+  }
+
   LatLng? _currentPosition;
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
@@ -33,7 +58,35 @@ class HomePageState extends State<HomePage> {
       // Location services are not enabled, don't continue
       // accessing the position and request users of the
       // App to enable the location services.
-      return Future.error('Location services are disabled.');
+      //return Future.error('Location services are disabled.');
+
+      // Show dialog when location is disabled
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder:
+              (BuildContext context) => AlertDialog(
+                title: const Text('Location Services Disabled'),
+                content: const Text(
+                  'Please enable location services to use this app.',
+                ),
+                actions: [
+                  TextButton(
+                    child: const Text('Open Settings'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Geolocator.openLocationSettings();
+                    },
+                  ),
+                  TextButton(
+                    child: const Text('Cancel'),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+        );
+      }
+      return;
     }
 
     permission = await Geolocator.checkPermission();
@@ -45,15 +98,49 @@ class HomePageState extends State<HomePage> {
         // Android's shouldShowRequestPermissionRationale
         // returned true. According to Android guidelines
         // your App should show an explanatory UI now.
-        return Future.error('Location permissions are denied');
+        //return Future.error('Location permissions are denied');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permissions are required')),
+          );
+        }
+        return;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
       // Permissions are denied forever, handle appropriately.
-      return Future.error(
-        'Location permissions are permanently denied, we cannot request permissions.',
-      );
+      // return Future.error(
+      //  'Location permissions are permanently denied, we cannot request permissions.',
+      // );
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder:
+              (BuildContext context) => AlertDialog(
+                title: const Text('Location Permission Required'),
+                content: const Text(
+                  'Location permissions are permanently denied. Please enable them in your device settings.',
+                ),
+                actions: [
+                  TextButton(
+                    child: const Text('Open Settings'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Geolocator.openAppSettings();
+                    },
+                  ),
+                  TextButton(
+                    child: const Text('Cancel'),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+        );
+      }
+      return;
     }
 
     // When we reach here, permissions are granted and we can
@@ -72,6 +159,101 @@ class HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Text(
+                  'Traffix',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search, color: Colors.grey.shade400),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search for a destination',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+
+      drawer: Drawer(
+        child: Column(
+          children: [
+            //profile page list tile
+            ListTile(
+              leading: Icon(Icons.person),
+              title: Text("Profile"),
+              onTap: () {
+                //pop drawer first
+                Navigator.pop(context);
+
+                //go to home page
+                Navigator.pushNamed(context, '/profilepage');
+              },
+            ),
+
+            //settings page list tile
+            ListTile(
+              leading: Icon(Icons.settings),
+              title: Text("Settings"),
+              onTap: () {
+                //pop drawer first
+                Navigator.pop(context);
+
+                //go to settings page
+                Navigator.pushNamed(context, '/settingspage');
+              },
+            ),
+          ],
+        ),
+      ),
+
+      // BottomNavigationBar in the build method
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Routes'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Alerts',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.phone), label: 'Emergency'),
+        ],
+      ),
+
       body: Stack(
         children: [
           // Map layer
@@ -81,7 +263,10 @@ class HomePageState extends State<HomePage> {
               options: MapOptions(
                 initialCenter:
                     _currentPosition ??
-                    LatLng(51.5074, -0.1278), // London coordinates as default
+                    LatLng(
+                      27.7103,
+                      85.3222,
+                    ), // Kathmandu coordinates as default
                 initialZoom: 13.0,
               ),
               children: [
@@ -103,7 +288,7 @@ class HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(4),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: .1),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -141,131 +326,8 @@ class HomePageState extends State<HomePage> {
               ],
             ),
           ),
-
-          // App bar with search
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      'Traffix',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.search, color: Colors.grey.shade400),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                decoration: InputDecoration(
-                                  hintText: 'Search for a destination',
-                                  hintStyle: TextStyle(
-                                    color: Colors.grey.shade400,
-                                  ),
-                                  border: InputBorder.none,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Bottom navigation bar
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              color: Colors.white,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildNavItem(Icons.home, 'Home', true),
-                      _buildNavItem(Icons.map, 'Routes', false),
-                      _buildNavItem(Icons.notifications, 'Alerts', false),
-                      _buildNavItem(Icons.phone, 'Emergency', false),
-                      _buildNavItem(Icons.person, 'Profile', false),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Attribution for OpenStreetMap (required)
-          Positioned(
-            bottom: 60,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              color: Colors.white.withOpacity(0.7),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.network(
-                    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Openstreetmap_logo.svg/256px-Openstreetmap_logo.svg.png',
-                    height: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  const Text(
-                    '© OpenStreetMap contributors',
-                    style: TextStyle(fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: isActive ? Colors.blue : Colors.grey),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: isActive ? Colors.blue : Colors.grey,
-            fontSize: 12,
-          ),
-        ),
-      ],
     );
   }
 }
