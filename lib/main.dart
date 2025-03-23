@@ -1,7 +1,13 @@
 import 'package:firebase_core/firebase_core.dart';
 //import 'firebase_options.dart';
 import 'package:flutter/material.dart';
-import 'package:traffix/pages/auth_page.dart';
+import 'package:traffix/pages/alerts_page.dart';
+import 'package:traffix/pages/auth_pages/auth_page.dart';
+import 'package:traffix/pages/emergency_page.dart';
+import 'package:traffix/pages/home_page.dart';
+import 'package:traffix/pages/profile_page.dart';
+import 'package:traffix/pages/routes_page.dart';
+import 'package:traffix/pages/settings_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,9 +20,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: AuthPage(),
+      home: const AuthPage(),
+      routes: {
+        '/homepage': (context) => const HomePage(),
+        '/routespage': (context) => const RoutesPage(),
+        '/alertspage': (context) => const AlertsPage(),
+        '/emegencypage': (context) => const EmergencyPage(),
+        '/profilepage': (context) => const ProfilePage(),
+        '/settingspage': (context) => const SettingsPage(),
+      },
     );
   }
 }
