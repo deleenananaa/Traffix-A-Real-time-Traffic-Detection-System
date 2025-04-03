@@ -141,11 +141,7 @@ class _SignupPageState extends State<SignupPage> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-<<<<<<< HEAD:lib/pages/signup_page.dart
                         color: Colors.grey.withValues(alpha: 0.1),
-=======
-                        color: Colors.grey.withValues(alpha: .1),
->>>>>>> recover-my-code:lib/pages/auth_pages/signup_page.dart
                         blurRadius: 10,
                         spreadRadius: 1,
                       ),
