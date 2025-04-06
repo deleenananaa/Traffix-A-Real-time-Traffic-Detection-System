@@ -50,8 +50,6 @@ dependencies:
   flutter_map_location_marker: ^10.0.0
   
 
-
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -261,64 +262,72 @@ class HomePageState extends State<HomePage> {
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                initialCenter:
-                    _currentPosition ??
-                    LatLng(
-                      27.7103,
-                      85.3222,
-                    ), // Kathmandu coordinates as default
-                initialZoom: 13.0,
+                initialCenter: LatLng(0, 0),
+                initialZoom: 10,
+                minZoom: 0,
+                maxZoom: 100,
               ),
               children: [
+                //display osm tiles
                 TileLayer(
                   urlTemplate:
                       "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                   subdomains: ['a', 'b', 'c'],
                   userAgentPackageName: 'com.example.app',
                 ),
-                // Zoom controls
-                Positioned(
-                  left: 16,
-                  top: 100,
+                //display location marker
+                CurrentLocationLayer(
+                  style: LocationMarkerStyle(
+                    marker: DefaultLocationMarker(
+                      child: Icon(Icons.location_pin, color: Colors.blue),
+                    ),
+                    markerSize: const Size(30, 30),
+                    markerDirection: MarkerDirection.heading,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Zoom controls - moved outside FlutterMap children
+          Positioned(
+            left: 16,
+            top: 100,
+            child: Column(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 10.0),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: Column(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: .1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () {
-                                final currentZoom = _mapController.camera.zoom;
-                                _mapController.move(
-                                  _mapController.camera.center,
-                                  currentZoom + 1,
-                                );
-                              },
-                            ),
-                            const Divider(height: 1, thickness: 1),
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: () {
-                                final currentZoom = _mapController.camera.zoom;
-                                _mapController.move(
-                                  _mapController.camera.center,
-                                  currentZoom - 1,
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: () {
+                          final currentZoom = _mapController.camera.zoom;
+                          _mapController.move(
+                            _mapController.camera.center,
+                            currentZoom + 1,
+                          );
+                        },
+                      ),
+                      const Divider(height: 1, thickness: 1),
+                      IconButton(
+                        icon: const Icon(Icons.remove),
+                        onPressed: () {
+                          final currentZoom = _mapController.camera.zoom;
+                          _mapController.move(
+                            _mapController.camera.center,
+                            currentZoom - 1,
+                          );
+                        },
                       ),
                     ],
                   ),
