@@ -1,5 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
-//import 'firebase_options.dart';
+import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:traffix/pages/alerts_page.dart';
 import 'package:traffix/pages/auth_pages/auth_page.dart';
@@ -11,7 +11,7 @@ import 'package:traffix/pages/settings_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 

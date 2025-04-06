@@ -25,11 +25,71 @@ class _SignupPageState extends State<SignupPage> {
   // Terms and conditions checkbox
   bool _agreeToTerms = false;
 
+  // error message function
+  void showErrorMessage(String message) {
+    String userFriendlyMessage = message;
+
+    // Convert Firebase error codes to user-friendly messages
+    switch (message) {
+      case 'weak-password':
+        userFriendlyMessage =
+            'The password provided is too weak. Please use at least 6 characters.';
+        break;
+      case 'email-already-in-use':
+        userFriendlyMessage = 'An account already exists with this email.';
+        break;
+      case 'invalid-email':
+        userFriendlyMessage = 'Please enter a valid email address.';
+        break;
+      case 'operation-not-allowed':
+        userFriendlyMessage =
+            'Email/password accounts are not enabled. Please contact support.';
+        break;
+      case 'network-request-failed':
+        userFriendlyMessage =
+            'Network error. Please check your internet connection and try again.';
+        break;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('Error', style: TextStyle(color: Colors.red)),
+          content: Text(
+            userFriendlyMessage,
+            style: const TextStyle(color: Colors.black),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // sign up function
   void signUserUp() async {
     // Check if terms are agreed to
     if (!_agreeToTerms) {
       showErrorMessage('Please agree to the Terms & Conditions');
+      return;
+    }
+
+    // Validate email format
+    if (!emailController.text.contains('@') ||
+        !emailController.text.contains('.')) {
+      showErrorMessage('invalid-email');
+      return;
+    }
+
+    // Validate password length
+    if (passwordController.text.length < 6) {
+      showErrorMessage('weak-password');
       return;
     }
 
@@ -47,39 +107,32 @@ class _SignupPageState extends State<SignupPage> {
         // Create the user
         UserCredential userCredential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(
-              email: emailController.text,
+              email: emailController.text.trim(),
               password: passwordController.text,
             );
 
-        // Update display name (optional - depending on your app's requirements)
+        // Update display name
         await userCredential.user?.updateDisplayName(nameController.text);
+
+        // hide loading circle
+        if (mounted) Navigator.pop(context);
       } else {
+        // hide loading circle
+        if (mounted) Navigator.pop(context);
         // show error message that passwords don't match
         showErrorMessage('Passwords do not match!');
       }
-      // hide loading circle
-      Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       // hide loading circle
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
       // show error message
       showErrorMessage(e.code);
+    } catch (e) {
+      // hide loading circle
+      if (mounted) Navigator.pop(context);
+      // show generic error message
+      showErrorMessage('An unexpected error occurred. Please try again.');
     }
-  }
-
-  // error message function
-  void showErrorMessage(String message) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.lightBlue,
-          title: Center(
-            child: Text(message, style: const TextStyle(color: Colors.white)),
-          ),
-        );
-      },
-    );
   }
 
   @override

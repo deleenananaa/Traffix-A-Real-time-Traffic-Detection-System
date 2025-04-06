@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
+import 'dart:async';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,54 +15,61 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   final user = FirebaseAuth.instance.currentUser;
-  // Add this variable to track selected index
   int _selectedIndex = 0;
-
-  // Add this method to handle navigation
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    switch (index) {
-      case 0: // Home
-        Navigator.pushReplacementNamed(context, '/homepage');
-        break;
-      case 1: // Routes
-        Navigator.pushReplacementNamed(context, '/routespage');
-        break;
-      case 2: // Alerts
-        Navigator.pushReplacementNamed(context, '/alertspage');
-        break;
-      case 3: // Emergency
-        Navigator.pushReplacementNamed(context, '/emergencypage');
-        break;
-    }
-  }
-
   LatLng? _currentPosition;
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
+  StreamSubscription<Position>? _positionStreamSubscription;
 
   @override
   void initState() {
     super.initState();
-    _determinePosition();
+    _initializeLocation();
   }
 
-  Future<void> _determinePosition() async {
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializeLocation() async {
+    try {
+      // First get the current position
+      Position position = await _determinePosition();
+      setState(() {
+        _currentPosition = LatLng(position.latitude, position.longitude);
+      });
+
+      // Move map to current position
+      _mapController.move(_currentPosition!, 15);
+
+      // Then start listening to position updates
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10, // Update every 10 meters
+        ),
+      ).listen((Position position) {
+        setState(() {
+          _currentPosition = LatLng(position.latitude, position.longitude);
+        });
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error getting location: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<Position> _determinePosition() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // Test if location services are enabled.
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // Location services are not enabled, don't continue
-      // accessing the position and request users of the
-      // App to enable the location services.
-      //return Future.error('Location services are disabled.');
-
-      // Show dialog when location is disabled
       if (mounted) {
         showDialog(
           context: context,
@@ -87,35 +95,18 @@ class HomePageState extends State<HomePage> {
               ),
         );
       }
-      return;
+      return Future.error('Location services are disabled.');
     }
 
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        // Permissions are denied, next time you could try
-        // requesting permissions again (this is also where
-        // Android's shouldShowRequestPermissionRationale
-        // returned true. According to Android guidelines
-        // your App should show an explanatory UI now.
-        //return Future.error('Location permissions are denied');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permissions are required')),
-          );
-        }
-        return;
+        return Future.error('Location permissions are denied');
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      // Permissions are denied forever, handle appropriately.
-      // return Future.error(
-      //  'Location permissions are permanently denied, we cannot request permissions.',
-      // );
-
       if (mounted) {
         showDialog(
           context: context,
@@ -141,15 +132,37 @@ class HomePageState extends State<HomePage> {
               ),
         );
       }
-      return;
+      return Future.error('Location permissions are permanently denied');
     }
 
-    // When we reach here, permissions are granted and we can
-    // continue accessing the position of the device.
-    Position position = await Geolocator.getCurrentPosition();
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 5),
+      ),
+    );
+  }
+
+  // Add this method to handle navigation
+  void _onItemTapped(int index) {
     setState(() {
-      _currentPosition = LatLng(position.latitude, position.longitude);
+      _selectedIndex = index;
     });
+
+    switch (index) {
+      case 0: // Home
+        Navigator.pushReplacementNamed(context, '/homepage');
+        break;
+      case 1: // Routes
+        Navigator.pushReplacementNamed(context, '/routespage');
+        break;
+      case 2: // Alerts
+        Navigator.pushReplacementNamed(context, '/alertspage');
+        break;
+      case 3: // Emergency
+        Navigator.pushReplacementNamed(context, '/emergencypage');
+        break;
+    }
   }
 
   // signout function
@@ -257,32 +270,31 @@ class HomePageState extends State<HomePage> {
 
       body: Stack(
         children: [
-          // Map layer
           Positioned.fill(
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                initialCenter: LatLng(0, 0),
-                initialZoom: 10,
-                minZoom: 0,
-                maxZoom: 100,
+                initialCenter: _currentPosition ?? const LatLng(0, 0),
+                initialZoom: 15,
+                minZoom: 3,
+                maxZoom: 18,
+                keepAlive: true,
               ),
               children: [
-                //display osm tiles
                 TileLayer(
                   urlTemplate:
                       "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  subdomains: ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.example.app',
+                  subdomains: const ['a', 'b', 'c'],
+                  userAgentPackageName: 'com.example.flutter_app',
                 ),
-                //display location marker
                 CurrentLocationLayer(
-                  style: LocationMarkerStyle(
+                  style: const LocationMarkerStyle(
                     marker: DefaultLocationMarker(
-                      child: Icon(Icons.location_pin, color: Colors.blue),
+                      child: Icon(Icons.navigation, color: Colors.white),
                     ),
-                    markerSize: const Size(30, 30),
+                    markerSize: Size(40, 40),
                     markerDirection: MarkerDirection.heading,
+                    accuracyCircleColor: Colors.blue,
                   ),
                 ),
               ],
