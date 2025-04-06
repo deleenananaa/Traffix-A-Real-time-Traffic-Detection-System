@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EmergencyPage extends StatefulWidget {
   const EmergencyPage({super.key});
@@ -28,6 +29,32 @@ class _EmergencyPageState extends State<EmergencyPage> {
       case 3: // Emergency
         Navigator.pushReplacementNamed(context, '/emergencypage');
         break;
+    }
+  }
+
+  // Function to handle emergency calls
+  Future<void> _makeEmergencyCall(String number) async {
+    final Uri phoneUri = Uri.parse('tel:$number');
+    try {
+      if (!await launchUrl(phoneUri)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open phone dialer for: $number'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error launching phone dialer: $number'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -119,23 +146,27 @@ class _EmergencyPageState extends State<EmergencyPage> {
                       children: [
                         _buildEmergencyContactCard(
                           'Traffic',
-                          Icons.phone,
-                          Colors.red,
+                          Icons.local_police,
+                          Colors.blue,
+                          () => _makeEmergencyCall('103'),
                         ),
                         _buildEmergencyContactCard(
                           'Ambulance',
                           Icons.local_hospital,
                           Colors.red,
+                          () => _makeEmergencyCall('102'),
                         ),
                         _buildEmergencyContactCard(
                           'Police',
-                          Icons.shield,
-                          Colors.red,
+                          Icons.local_police,
+                          Colors.indigo,
+                          () => _makeEmergencyCall('100'),
                         ),
                         _buildEmergencyContactCard(
                           'Fire Dept.',
                           Icons.local_fire_department,
-                          Colors.red,
+                          Colors.orange,
+                          () => _makeEmergencyCall('101'),
                         ),
                       ],
                     ),
@@ -149,14 +180,17 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
   }
 
-  Widget _buildEmergencyContactCard(String title, IconData icon, Color color) {
+  Widget _buildEmergencyContactCard(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onPressed,
+  ) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () {
-          // Functionality will be added later
-        },
+        onTap: onPressed,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
