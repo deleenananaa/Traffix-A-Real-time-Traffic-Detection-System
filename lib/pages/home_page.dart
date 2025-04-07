@@ -5,7 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'dart:async';
-import '../services/tomtom_service.dart';
+import '../services/map_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -21,7 +21,6 @@ class HomePageState extends State<HomePage> {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
   StreamSubscription<Position>? _positionStreamSubscription;
-  final TomTomService _tomtomService = TomTomService();
   Timer? _debounce;
   List<SearchResult> _searchResults = [];
   bool _isSearching = false;
@@ -41,6 +40,7 @@ class HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _debounce?.cancel();
     _positionStreamSubscription?.cancel();
     super.dispose();
@@ -156,7 +156,6 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  // Add this method to handle navigation
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -178,12 +177,10 @@ class HomePageState extends State<HomePage> {
     }
   }
 
-  // signout function
   void signUserOut() async {
     await FirebaseAuth.instance.signOut();
   }
 
-  // Add this method to handle search
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
@@ -192,7 +189,7 @@ class HomePageState extends State<HomePage> {
           _isSearching = true;
         });
         try {
-          final results = await _tomtomService.searchLocation(query);
+          final results = await MapService.searchLocation(query);
           setState(() {
             _searchResults = results;
             _isSearching = false;
@@ -310,19 +307,13 @@ class HomePageState extends State<HomePage> {
                 keepAlive: true,
               ),
               children: [
-                TileLayer(
-                  urlTemplate:
-                      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  subdomains: const ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.example.traffix_app',
-                  maxZoom: 19, // Match the MapOptions maxZoom
-                ),
+                MapService.getTileLayer(),
                 CurrentLocationLayer(
                   style: const LocationMarkerStyle(
                     marker: DefaultLocationMarker(
                       child: Icon(Icons.navigation, color: Colors.white),
                     ),
-                    markerSize: Size(40, 40),
+                    markerSize: Size(30, 30),
                     markerDirection: MarkerDirection.heading,
                     accuracyCircleColor: Colors.blue,
                   ),
@@ -341,7 +332,7 @@ class HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: .1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         spreadRadius: 1,
                         offset: const Offset(0, 2),
@@ -495,6 +486,15 @@ class HomePageState extends State<HomePage> {
               child: Column(
                 children: [
                   IconButton(
+                    icon: const Icon(Icons.my_location),
+                    onPressed: () {
+                      if (_currentPosition != null) {
+                        _mapController.move(_currentPosition!, 18);
+                      }
+                    },
+                  ),
+                  Container(height: 1, color: Colors.grey.shade400),
+                  IconButton(
                     icon: const Icon(Icons.add),
                     onPressed: () {
                       final currentZoom = _mapController.camera.zoom;
@@ -504,7 +504,7 @@ class HomePageState extends State<HomePage> {
                       );
                     },
                   ),
-                  Container(height: 1, color: Colors.grey.shade300),
+                  Container(height: 1, color: Colors.grey.shade400),
                   IconButton(
                     icon: const Icon(Icons.remove),
                     onPressed: () {

@@ -4,9 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter/material.dart';
 
 class TomTomService {
-  static const String apiKey =
-      'qtP5UjXyzP4HHYqeflA7kChZ3dtZKh7W'; // Replace with your API key
-  static const String baseUrl = 'https://api.tomtom.com/search/2/search';
+  static const String apiKey = 'qtP5UjXyzP4HHYqeflA7kChZ3dtZKh7W';
   static const String trafficUrl = 'https://api.tomtom.com/traffic/1';
 
   // Kathmandu Valley bounding box coordinates
@@ -14,39 +12,6 @@ class TomTomService {
   static const double maxLat = 27.8075; // Northern boundary
   static const double minLon = 85.2443; // Western boundary
   static const double maxLon = 85.5419; // Eastern boundary
-
-  Future<List<SearchResult>> searchLocation(String query) async {
-    if (query.isEmpty) return [];
-
-    final url = Uri.parse('$baseUrl/$query.json?key=$apiKey&limit=5');
-
-    try {
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final results = data['results'] as List;
-
-        return results
-            .map(
-              (result) => SearchResult(
-                name:
-                    result['poi']?['name'] ??
-                    result['address']['freeformAddress'],
-                address: result['address']['freeformAddress'],
-                position: LatLng(
-                  result['position']['lat'],
-                  result['position']['lon'],
-                ),
-              ),
-            )
-            .toList();
-      }
-      throw Exception('Failed to load search results');
-    } catch (e) {
-      throw Exception('Error searching location: $e');
-    }
-  }
 
   Future<List<TrafficIncident>> getTrafficIncidents() async {
     final url =
@@ -92,18 +57,6 @@ class TomTomService {
       throw Exception('Error fetching traffic incidents: $e');
     }
   }
-}
-
-class SearchResult {
-  final String name;
-  final String address;
-  final LatLng position;
-
-  SearchResult({
-    required this.name,
-    required this.address,
-    required this.position,
-  });
 }
 
 class TrafficIncident {

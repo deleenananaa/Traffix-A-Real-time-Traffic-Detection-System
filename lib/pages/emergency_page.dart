@@ -105,7 +105,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                       margin: const EdgeInsets.only(bottom: 24),
                       child: ElevatedButton(
                         onPressed: () {
-                          // Functionality will be added later
+                          _makeEmergencyCall('1149');
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red.shade600,
@@ -116,7 +116,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                           ),
                         ),
                         child: const Text(
-                          'Activate Emergency Mode',
+                          'Natural Disaster SOS',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
