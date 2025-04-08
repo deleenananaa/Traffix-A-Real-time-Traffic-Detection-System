@@ -6,6 +6,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'dart:async';
 import '../services/map_service.dart';
+import '../services/traffic_service.dart';
+import '../widgets/traffic_overlay.dart';
+import 'package:uuid/uuid.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,6 +28,11 @@ class HomePageState extends State<HomePage> {
   List<SearchResult> _searchResults = [];
   bool _isSearching = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  late TrafficService _trafficService;
+  List<TrafficData> _trafficData = [];
+  List<TrafficIncident> _incidents = [];
+  StreamSubscription? _trafficSubscription;
+  StreamSubscription? _incidentsSubscription;
 
   final LocationSettings locationSettings = const LocationSettings(
     accuracy: LocationAccuracy.bestForNavigation,
@@ -35,7 +43,9 @@ class HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _trafficService = TrafficService();
     _initializeLocation();
+    _initializeTrafficData();
   }
 
   @override
@@ -43,6 +53,8 @@ class HomePageState extends State<HomePage> {
     _searchController.dispose();
     _debounce?.cancel();
     _positionStreamSubscription?.cancel();
+    _trafficSubscription?.cancel();
+    _incidentsSubscription?.cancel();
     super.dispose();
   }
 
@@ -221,6 +233,93 @@ class HomePageState extends State<HomePage> {
     });
   }
 
+  void _initializeTrafficData() {
+    _trafficSubscription = _trafficService.trafficDataStream.listen((data) {
+      setState(() {
+        _trafficData = data;
+      });
+    });
+
+    _incidentsSubscription = _trafficService.incidentsStream.listen((
+      incidents,
+    ) {
+      setState(() {
+        _incidents = incidents;
+      });
+    });
+  }
+
+  void _showIncidentDialog(BuildContext context) {
+    String selectedType = 'accident';
+    final TextEditingController descriptionController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Report Traffic Incident'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButton<String>(
+                  value: selectedType,
+                  items:
+                      ['accident', 'construction', 'roadblock', 'other']
+                          .map(
+                            (type) => DropdownMenuItem(
+                              value: type,
+                              child: Text(type.toUpperCase()),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) {
+                    selectedType = value!;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Enter incident details...',
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (_currentPosition != null) {
+                    _trafficService.reportIncident(
+                      TrafficIncident(
+                        id: const Uuid().v4(),
+                        location: LatLng(
+                          _currentPosition!.latitude,
+                          _currentPosition!.longitude,
+                        ),
+                        type: selectedType,
+                        description: descriptionController.text,
+                        reportTime: DateTime.now(),
+                        status: 'active',
+                        reportedBy:
+                            user?.uid ?? '', // Replace with actual user ID
+                      ),
+                    );
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text('Report'),
+              ),
+            ],
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -307,17 +406,34 @@ class HomePageState extends State<HomePage> {
                 keepAlive: true,
               ),
               children: [
-                MapService.getTileLayer(),
+                TileLayer(
+                  urlTemplate: MapService.getTileLayer(),
+                  userAgentPackageName: 'com.traffix.app',
+                ),
+                if (_trafficData.isNotEmpty || _incidents.isNotEmpty)
+                  TrafficOverlay(
+                    trafficData: _trafficData,
+                    incidents: _incidents,
+                    onIncidentTap: (incident) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '${incident.type}: ${incident.description}',
+                          ),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    },
+                  ),
                 CurrentLocationLayer(
+                  positionStream: _createPositionStream(),
                   style: const LocationMarkerStyle(
                     marker: DefaultLocationMarker(
                       child: Icon(Icons.navigation, color: Colors.white),
                     ),
-                    markerSize: Size(30, 30),
-                    markerDirection: MarkerDirection.heading,
+                    markerSize: Size(40, 40),
                     accuracyCircleColor: Colors.blue,
                   ),
-                  positionStream: _createPositionStream(),
                 ),
               ],
             ),
@@ -518,6 +634,16 @@ class HomePageState extends State<HomePage> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () => _showIncidentDialog(context),
+            backgroundColor: Colors.red,
+            child: const Icon(Icons.report_problem),
           ),
         ],
       ),

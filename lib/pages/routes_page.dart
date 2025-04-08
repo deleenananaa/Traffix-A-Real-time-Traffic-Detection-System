@@ -232,7 +232,7 @@ class _RoutesPageState extends State<RoutesPage> {
             mapController: _mapController,
             options: MapService.defaultMapOptions,
             children: [
-              MapService.getTileLayer(),
+              TileLayer(urlTemplate: MapService.getTileLayer()),
               // Current location marker
               CurrentLocationLayer(
                 style: const LocationMarkerStyle(
