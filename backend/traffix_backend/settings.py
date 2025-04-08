@@ -31,6 +31,8 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
+# Firebase Admin SDK Configuration
+FIREBASE_ADMIN_CERT = os.getenv('FIREBASE_ADMIN_CERT')
 
 # Application definition
 

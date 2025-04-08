@@ -9,13 +9,8 @@ class MapService {
   static const String nominatimBaseUrl = 'nominatim.openstreetmap.org';
 
   // Get TileLayer for the map
-  static TileLayer getTileLayer() {
-    return TileLayer(
-      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      userAgentPackageName: 'com.traffix.app',
-      maxZoom: 19,
-      minZoom: 0,
-    );
+  static String getTileLayer() {
+    return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   }
 
   // Default map options for Kathmandu
