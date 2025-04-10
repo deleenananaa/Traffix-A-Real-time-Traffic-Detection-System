@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart' as flutter_map;
+import 'package:latlong2/latlong.dart' as latlong;
 import '../services/map_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
+import 'package:graphhooper_route_navigation/graphhooper_route_navigation.dart';
 
 class RoutesPage extends StatefulWidget {
   const RoutesPage({super.key});
@@ -16,13 +17,13 @@ class RoutesPage extends StatefulWidget {
 class _RoutesPageState extends State<RoutesPage> {
   // Add this variable to track selected index
   int _selectedIndex = 1;
-  final MapController _mapController = MapController();
+  final flutter_map.MapController _mapController = flutter_map.MapController();
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _endController = TextEditingController();
 
-  LatLng? _currentLocation;
-  LatLng? _startLocation;
-  LatLng? _endLocation;
+  latlong.LatLng? _currentLocation;
+  latlong.LatLng? _startLocation;
+  latlong.LatLng? _endLocation;
   List<SearchResult> _startSearchResults = [];
   List<SearchResult> _endSearchResults = [];
   RouteResult? _routeResult;
@@ -30,6 +31,7 @@ class _RoutesPageState extends State<RoutesPage> {
   Timer? _startDebounce;
   Timer? _endDebounce;
   StreamSubscription<Position>? _locationSubscription;
+  final ApiRequest _apiRequest = ApiRequest();
 
   @override
   void initState() {
@@ -52,7 +54,10 @@ class _RoutesPageState extends State<RoutesPage> {
     try {
       final position = await MapService.getCurrentLocation();
       setState(() {
-        _currentLocation = LatLng(position.latitude, position.longitude);
+        _currentLocation = latlong.LatLng(
+          position.latitude,
+          position.longitude,
+        );
       });
 
       _mapController.move(_currentLocation!, 15);
@@ -60,7 +65,10 @@ class _RoutesPageState extends State<RoutesPage> {
       // Start listening to location updates
       _locationSubscription = MapService.getLocationStream().listen((position) {
         setState(() {
-          _currentLocation = LatLng(position.latitude, position.longitude);
+          _currentLocation = latlong.LatLng(
+            position.latitude,
+            position.longitude,
+          );
         });
       });
     } catch (e) {
@@ -138,9 +146,15 @@ class _RoutesPageState extends State<RoutesPage> {
 
   void _updateMapView() {
     if (_startLocation != null && _endLocation != null) {
-      final bounds = LatLngBounds.fromPoints([_startLocation!, _endLocation!]);
+      final bounds = flutter_map.LatLngBounds.fromPoints([
+        _startLocation!,
+        _endLocation!,
+      ]);
       _mapController.fitCamera(
-        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+        flutter_map.CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(50.0),
+        ),
       );
     } else if (_startLocation != null) {
       _mapController.move(_startLocation!, 15);
@@ -171,9 +185,12 @@ class _RoutesPageState extends State<RoutesPage> {
       });
 
       if (route.points.isNotEmpty) {
-        final bounds = LatLngBounds.fromPoints(route.points);
+        final bounds = flutter_map.LatLngBounds.fromPoints(route.points);
         _mapController.fitCamera(
-          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+          flutter_map.CameraFit.bounds(
+            bounds: bounds,
+            padding: const EdgeInsets.all(50.0),
+          ),
         );
       }
     } catch (e) {
@@ -184,6 +201,48 @@ class _RoutesPageState extends State<RoutesPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error finding route: $e')));
+      }
+    }
+  }
+
+  Future<void> _startNavigation() async {
+    if (_startLocation == null || _endLocation == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select both start and end locations'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final directionRouteResponse = await _apiRequest
+          .getDrivingRouteUsingGraphHooper(
+            source: LatLng(_startLocation!.latitude, _startLocation!.longitude),
+            destination: LatLng(
+              _endLocation!.latitude,
+              _endLocation!.longitude,
+            ),
+            graphHooperApiKey: "4428d23a-1fa5-4d94-9409-7d87dd50c132",
+            navigationType: NavigationProfile.car,
+          );
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => NavigationWrapperScreen(
+                directionRouteResponse: directionRouteResponse,
+              ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting navigation: $e')),
+        );
       }
     }
   }
@@ -228,11 +287,11 @@ class _RoutesPageState extends State<RoutesPage> {
       ),
       body: Stack(
         children: [
-          FlutterMap(
+          flutter_map.FlutterMap(
             mapController: _mapController,
             options: MapService.defaultMapOptions,
             children: [
-              TileLayer(urlTemplate: MapService.getTileLayer()),
+              flutter_map.TileLayer(urlTemplate: MapService.getTileLayer()),
               // Current location marker
               CurrentLocationLayer(
                 style: const LocationMarkerStyle(
@@ -245,10 +304,10 @@ class _RoutesPageState extends State<RoutesPage> {
                 ),
               ),
               // Start and end location markers
-              MarkerLayer(
+              flutter_map.MarkerLayer(
                 markers: [
                   if (_startLocation != null)
-                    Marker(
+                    flutter_map.Marker(
                       point: _startLocation!,
                       width: 40,
                       height: 40,
@@ -259,7 +318,7 @@ class _RoutesPageState extends State<RoutesPage> {
                       ),
                     ),
                   if (_endLocation != null)
-                    Marker(
+                    flutter_map.Marker(
                       point: _endLocation!,
                       width: 40,
                       height: 40,
@@ -273,9 +332,9 @@ class _RoutesPageState extends State<RoutesPage> {
               ),
               // Route polyline
               if (_routeResult != null)
-                PolylineLayer(
+                flutter_map.PolylineLayer(
                   polylines: [
-                    Polyline(
+                    flutter_map.Polyline(
                       points: _routeResult!.points,
                       strokeWidth: 4,
                       color: Colors.blue,
@@ -365,18 +424,36 @@ class _RoutesPageState extends State<RoutesPage> {
                         },
                       ),
                     ),
-                  // Find route button
+                  // Find route and Start Navigation buttons
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _findRoute,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      child:
-                          _isLoading
-                              ? const CircularProgressIndicator()
-                              : const Text('Find Route'),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _findRoute,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(50),
+                            ),
+                            child:
+                                _isLoading
+                                    ? const CircularProgressIndicator()
+                                    : const Text('Find Route'),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed:
+                                _routeResult == null ? null : _startNavigation,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(50),
+                              backgroundColor: Colors.green,
+                            ),
+                            child: const Text('Start Navigation'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

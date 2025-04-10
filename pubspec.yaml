@@ -50,9 +50,10 @@ dependencies:
   http: ^1.3.0
   flutter_polyline_points: ^2.1.0
   flutter_map_location_marker: ^10.0.0
+  graphhooper_route_navigation: ^0.0.8
 
   #Mapbox
-  flutter_mapbox_navigation: ^0.2.2
+  #flutter_mapbox_navigation: ^0.2.2
 
   #phone call
   url_launcher: ^6.3.1
