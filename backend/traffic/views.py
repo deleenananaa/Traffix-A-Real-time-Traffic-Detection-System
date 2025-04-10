@@ -9,12 +9,14 @@ from .serializers import (
     AlertSerializer,
     EmergencyVehicleSerializer,
 )
-from .services.tomtom_service import TomTomService
+from .services.osrm_service import OSRMService
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Avg
+import firebase_admin
+from firebase_admin import db
 
 # Create your views here.
 
@@ -22,14 +24,13 @@ class TrafficViewSet(viewsets.ModelViewSet):
     queryset = TrafficData.objects.all()
     serializer_class = TrafficDataSerializer
     permission_classes = [permissions.AllowAny]
-    tomtom_service = TomTomService()
+    osrm_service = OSRMService()
 
     @action(detail=False, methods=['get'])
     def flow(self, request):
         """Get traffic flow data for a bounding box"""
         bbox = request.query_params.get('bbox')
-        zoom = request.query_params.get('zoom', 10)
-        style = request.query_params.get('style', 'relative0')
+        zoom = request.query_params.get('zoom', 13)
         
         if not bbox:
             return Response(
@@ -45,7 +46,7 @@ class TrafficViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            data = self.tomtom_service.get_traffic_flow(bbox, zoom=zoom, style=style)
+            data = self.osrm_service.get_traffic_flow(bbox, zoom=zoom)
             return Response(data)
         except ValueError as e:
             return Response(
@@ -58,19 +59,12 @@ class TrafficViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @action(detail=False, methods=['get'])
-    def incidents(self, request):
-        """Get traffic incidents in a bounding box"""
-        bbox = request.query_params.get('bbox')
-        if not bbox:
-            return Response(
-                {'error': 'bbox parameter is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+    @action(detail=False, methods=['post'])
+    def sync_with_firebase(self, request):
+        """Manually trigger Firebase synchronization"""
         try:
-            data = self.tomtom_service.get_traffic_incidents(bbox)
-            return Response(data)
+            self.osrm_service.sync_traffic_data()
+            return Response({'status': 'success'})
         except Exception as e:
             return Response(
                 {'error': str(e)},
@@ -81,7 +75,7 @@ class RouteViewSet(viewsets.ModelViewSet):
     queryset = Route.objects.all()
     serializer_class = RouteSerializer
     permission_classes = [permissions.AllowAny]
-    tomtom_service = TomTomService()
+    osrm_service = OSRMService()
 
     @action(detail=False, methods=['post'])
     def calculate(self, request):
@@ -97,7 +91,7 @@ class RouteViewSet(viewsets.ModelViewSet):
             )
         
         try:
-            data = self.tomtom_service.calculate_route(start, end, waypoints)
+            data = self.osrm_service.calculate_route(start, end, waypoints)
             return Response(data)
         except Exception as e:
             return Response(
@@ -106,20 +100,25 @@ class RouteViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=False, methods=['post'])
-    def matrix(self, request):
-        """Calculate matrix routing"""
-        origins = request.data.get('origins', [])
-        destinations = request.data.get('destinations', [])
+    def alternatives(self, request):
+        """Get alternative routes avoiding congested areas"""
+        start = request.data.get('start')
+        end = request.data.get('end')
+        max_alternatives = request.data.get('max_alternatives', 3)
         
-        if not origins or not destinations:
+        if not start or not end:
             return Response(
-                {'error': 'origins and destinations are required'},
+                {'error': 'start and end points are required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         try:
-            data = self.tomtom_service.get_matrix_routes(origins, destinations)
-            return Response(data)
+            routes = self.osrm_service.get_alternative_routes(
+                start,
+                end,
+                max_alternatives
+            )
+            return Response({'routes': routes})
         except Exception as e:
             return Response(
                 {'error': str(e)},
@@ -128,7 +127,7 @@ class RouteViewSet(viewsets.ModelViewSet):
 
 class LocationViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
-    tomtom_service = TomTomService()
+    osrm_service = OSRMService()
 
     @action(detail=False, methods=['get'])
     def search(self, request):
@@ -144,7 +143,7 @@ class LocationViewSet(viewsets.ViewSet):
             )
         
         try:
-            data = self.tomtom_service.search_location(
+            data = self.osrm_service.search_location(
                 query,
                 float(lat) if lat else None,
                 float(lon) if lon else None
@@ -169,7 +168,7 @@ class LocationViewSet(viewsets.ViewSet):
             )
         
         try:
-            data = self.tomtom_service.reverse_geocode(float(lat), float(lon))
+            data = self.osrm_service.reverse_geocode(float(lat), float(lon))
             return Response(data)
         except Exception as e:
             return Response(
@@ -186,6 +185,7 @@ class TrafficDataViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['location', 'road_closure']
     ordering_fields = ['timestamp', 'current_speed', 'free_flow_speed']
+    osrm_service = OSRMService()
 
     @action(detail=False, methods=['get'])
     def current_conditions(self, request):
@@ -202,10 +202,13 @@ class TrafficDataViewSet(viewsets.ReadOnlyModelViewSet):
                 conditions[loc['location']] = {
                     'current_speed': latest.current_speed,
                     'free_flow_speed': latest.free_flow_speed,
-                    'congestion_level': (
-                        (latest.free_flow_speed - latest.current_speed) 
-                        / latest.free_flow_speed * 100 if latest.current_speed and latest.free_flow_speed
-                        else 0
+                    'density': self.osrm_service._calculate_density(
+                        latest.current_speed,
+                        latest.free_flow_speed
+                    ),
+                    'congestion_level': self.osrm_service._get_congestion_level(
+                        latest.current_speed,
+                        latest.free_flow_speed
                     ),
                     'road_closure': latest.road_closure,
                     'timestamp': latest.timestamp
@@ -229,10 +232,17 @@ class TrafficDataViewSet(viewsets.ReadOnlyModelViewSet):
                 avg_travel_time=Avg('current_travel_time')
             )
             
-            analysis[loc['location']] = {
-                'average_speed': round(data['avg_speed'], 2) if data['avg_speed'] else 0,
-                'average_travel_time': round(data['avg_travel_time'], 2) if data['avg_travel_time'] else 0
-            }
+            if data['avg_speed']:
+                analysis[loc['location']] = {
+                    'average_speed': round(data['avg_speed'], 2),
+                    'average_travel_time': round(data['avg_travel_time'], 2) if data['avg_travel_time'] else 0,
+                    'average_density': self.osrm_service._calculate_density(
+                        data['avg_speed'],
+                        TrafficData.objects.filter(
+                            location=loc['location']
+                        ).first().free_flow_speed
+                    )
+                }
         
         return Response(analysis)
 
