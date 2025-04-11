@@ -129,6 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                       TextField(
                         controller: emailController,
                         decoration: InputDecoration(
+                          labelText: 'Email',
                           hintText: 'Enter your email',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],
@@ -162,6 +163,7 @@ class _LoginPageState extends State<LoginPage> {
                         controller: passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
+                          labelText: 'Password',
                           hintText: 'Enter your password',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],

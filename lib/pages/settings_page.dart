@@ -14,19 +14,24 @@ class SettingsPage extends StatelessWidget {
                 horizontal: 16.0,
                 vertical: 12.0,
               ),
+              color: Theme.of(context).colorScheme.surface,
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back),
+                    icon: Icon(
+                      Icons.arrow_back,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
                         'Settings',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -37,7 +42,11 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
 
-            const Divider(height: 1, thickness: 1),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: Theme.of(context).dividerColor,
+            ),
 
             Expanded(
               child: ListView(
@@ -94,11 +103,20 @@ class SettingsPage extends StatelessWidget {
                   //     ],
                   //   ),
                   // ),
-                  const Padding(
-                    padding: EdgeInsets.only(left: 16, top: 16, bottom: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      top: 16,
+                      bottom: 8,
+                    ),
                     child: Text(
                       'Help & Support',
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
+                      style: TextStyle(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: .6),
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                   Container(
@@ -107,11 +125,13 @@ class SettingsPage extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Color(0xFFFFFFFF),
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withValues(alpha: .2),
+                          color: Theme.of(
+                            context,
+                          ).shadowColor.withValues(alpha: .2),
                           spreadRadius: 1,
                           blurRadius: 3,
                           offset: const Offset(0, 2),
@@ -121,48 +141,105 @@ class SettingsPage extends StatelessWidget {
                     child: Column(
                       children: [
                         ListTile(
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.email_outlined,
-                            color: Colors.grey,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .6),
                           ),
-                          title: const Text('Contact Support'),
-                          trailing: const Icon(Icons.chevron_right),
+                          title: Text(
+                            'Contact Support',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .6),
+                          ),
                           onTap: () {
                             // Handle contact support
                           },
                         ),
-                        const Divider(height: 1),
+                        Divider(
+                          height: 1,
+                          color: Theme.of(context).dividerColor,
+                        ),
                         ListTile(
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.help_outline,
-                            color: Colors.grey,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .6),
                           ),
-                          title: const Text('FAQs & Tutorials'),
-                          trailing: const Icon(Icons.chevron_right),
+                          title: Text(
+                            'FAQs & Tutorials',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .6),
+                          ),
                           onTap: () {
                             // Handle FAQs & tutorials
                           },
                         ),
-                        const Divider(height: 1),
+                        Divider(
+                          height: 1,
+                          color: Theme.of(context).dividerColor,
+                        ),
                         ListTile(
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.info_outline,
-                            color: Colors.grey,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .6),
                           ),
-                          title: const Text('About the App'),
-                          trailing: const Icon(Icons.chevron_right),
+                          title: Text(
+                            'About the App',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .6),
+                          ),
                           onTap: () {
                             // Handle about the app
                           },
                         ),
-                        const Divider(height: 1),
+                        Divider(
+                          height: 1,
+                          color: Theme.of(context).dividerColor,
+                        ),
                         ListTile(
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.description_outlined,
-                            color: Colors.grey,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .6),
                           ),
-                          title: const Text('Terms & Conditions'),
-                          trailing: const Icon(Icons.chevron_right),
+                          title: Text(
+                            'Terms & Conditions',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          trailing: Icon(
+                            Icons.chevron_right,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: .6),
+                          ),
                           onTap: () {
                             // Handle terms & conditions
                           },

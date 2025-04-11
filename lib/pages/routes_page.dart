@@ -451,123 +451,196 @@ class _RoutesPageState extends State<RoutesPage> {
                 ),
             ],
           ),
-          // Search panel
-          Positioned(
-            top: MediaQuery.of(context).padding.top,
-            left: 0,
-            right: 0,
-            child: Container(
-              color: Colors.white,
-              child: Column(
-                children: [
-                  // Start location search
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextField(
-                      controller: _startController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter start location',
-                        prefixIcon: const Icon(
-                          Icons.location_on,
-                          color: Colors.green,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+          // Add map controls- Only show when not navigating
+          if (!_isNavigating)
+            Positioned(
+              left: 16,
+              bottom: 100,
+              child: Card(
+                child: Column(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.my_location),
+                      onPressed: () {
+                        if (_currentLocation != null) {
+                          _mapController.move(_currentLocation!, 18);
+                        }
+                      },
                     ),
-                  ),
-                  if (_startSearchResults.isNotEmpty)
-                    Container(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.2,
-                      ),
-                      color: Colors.white,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _startSearchResults.length,
-                        itemBuilder: (context, index) {
-                          final result = _startSearchResults[index];
-                          return ListTile(
-                            title: Text(result.name),
-                            subtitle: Text(result.address),
-                            onTap: () => _onStartLocationSelected(result),
-                          );
-                        },
-                      ),
+                    Container(height: 1, color: Colors.grey.shade400),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: () {
+                        final currentZoom = _mapController.camera.zoom;
+                        _mapController.move(
+                          _mapController.camera.center,
+                          currentZoom + 1,
+                        );
+                      },
                     ),
-                  // End location search
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextField(
-                      controller: _endController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter destination',
-                        prefixIcon: const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+                    Container(height: 1, color: Colors.grey.shade400),
+                    IconButton(
+                      icon: const Icon(Icons.remove),
+                      onPressed: () {
+                        final currentZoom = _mapController.camera.zoom;
+                        _mapController.move(
+                          _mapController.camera.center,
+                          currentZoom - 1,
+                        );
+                      },
                     ),
-                  ),
-                  if (_endSearchResults.isNotEmpty)
-                    Container(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.2,
-                      ),
-                      color: Colors.white,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _endSearchResults.length,
-                        itemBuilder: (context, index) {
-                          final result = _endSearchResults[index];
-                          return ListTile(
-                            title: Text(result.name),
-                            subtitle: Text(result.address),
-                            onTap: () => _onEndLocationSelected(result),
-                          );
-                        },
-                      ),
-                    ),
-                  // Find route and Start Navigation buttons
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _findRoute,
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(50),
-                            ),
-                            child:
-                                _isLoading
-                                    ? const CircularProgressIndicator()
-                                    : const Text('Find Route'),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed:
-                                _routeResult == null ? null : _startNavigation,
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(50),
-                              backgroundColor: Colors.green,
-                            ),
-                            child: const Text('Start Navigation'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+
+          // Search panel - Only show when not navigating
+          if (!_isNavigating)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 20,
+              right: 20,
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Start location search
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: TextField(
+                          controller: _startController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter start location',
+                            prefixIcon: const Icon(
+                              Icons.location_on,
+                              color: Colors.green,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_startSearchResults.isNotEmpty)
+                        Container(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.2,
+                          ),
+                          color: Colors.white,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _startSearchResults.length,
+                            itemBuilder: (context, index) {
+                              final result = _startSearchResults[index];
+                              return ListTile(
+                                title: Text(result.name),
+                                subtitle: Text(result.address),
+                                onTap: () => _onStartLocationSelected(result),
+                              );
+                            },
+                          ),
+                        ),
+                      // End location search
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: TextField(
+                          controller: _endController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter destination',
+                            prefixIcon: const Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_endSearchResults.isNotEmpty)
+                        Container(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.2,
+                          ),
+                          color: Colors.white,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _endSearchResults.length,
+                            itemBuilder: (context, index) {
+                              final result = _endSearchResults[index];
+                              return ListTile(
+                                title: Text(result.name),
+                                subtitle: Text(result.address),
+                                onTap: () => _onEndLocationSelected(result),
+                              );
+                            },
+                          ),
+                        ),
+                      // Find route and Start Navigation buttons
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _findRoute,
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40),
+                                ),
+                                child:
+                                    _isLoading
+                                        ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                        : const Text('Find Route'),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed:
+                                    _routeResult == null
+                                        ? null
+                                        : _startNavigation,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40),
+                                ),
+                                child: const Text('Start Navigation'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // Add navigation panel when navigating
           if (_isNavigating && _instructions != null)
@@ -606,8 +679,9 @@ class _RoutesPageState extends State<RoutesPage> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close),
+                            icon: const Icon(Icons.close, color: Colors.red),
                             onPressed: _stopNavigation,
+                            tooltip: 'Stop Navigation',
                           ),
                         ],
                       ),
