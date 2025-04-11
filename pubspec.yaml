@@ -38,10 +38,9 @@ dependencies:
   firebase_core: ^3.12.1
   firebase_messaging: ^15.2.4
   firebase_database: ^11.3.5
-  logger: ^2.5.0
   google_sign_in: ^6.3.0
   collection: ^1.19.1
-  
+
   #OpenStreetMap
   flutter_map: ^8.1.1
   latlong2: ^0.9.1
@@ -50,15 +49,19 @@ dependencies:
   http: ^1.3.0
   flutter_polyline_points: ^2.1.0
   flutter_map_location_marker: ^10.0.0
-  graphhooper_route_navigation: ^0.0.8
+  routing_client_dart: ^1.0.7
 
-  #Mapbox
-  #flutter_mapbox_navigation: ^0.2.2
+  #theme
+  flex_color_scheme: ^8.2.0
 
   #phone call
   url_launcher: ^6.3.1
 
   logging: ^1.2.0
+  logger: ^2.5.0
+  uuid: ^4.5.1
+  provider: ^6.1.4
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

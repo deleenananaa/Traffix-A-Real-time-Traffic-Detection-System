@@ -324,30 +324,48 @@ class HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      appBar: null,
       drawer: Drawer(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         child: Column(
           children: [
             DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: .1),
+              ),
               child: Column(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.directions_car_rounded,
                     size: 70,
-                    color: Colors.blue,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   Text(
                     'Traffix',
-                    style: const TextStyle(color: Colors.blue, fontSize: 20),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 20,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Divider(),
+            Divider(color: Theme.of(context).dividerColor),
             //profile page list tile
             ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text("Profile"),
+              leading: Icon(
+                Icons.person,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: .6),
+              ),
+              title: Text(
+                "Profile",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/profilepage');
@@ -355,17 +373,33 @@ class HomePageState extends State<HomePage> {
             ),
             //settings page list tile
             ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text("Settings"),
+              leading: Icon(
+                Icons.settings,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: .6),
+              ),
+              title: Text(
+                "Settings",
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/settingspage');
               },
             ),
-            const Divider(),
+            Divider(color: Theme.of(context).dividerColor),
             ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text("Sign Out"),
+              leading: Icon(
+                Icons.logout,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                "Sign Out",
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 signUserOut();
@@ -439,11 +473,13 @@ class HomePageState extends State<HomePage> {
                 Container(
                   margin: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Theme.of(
+                          context,
+                        ).shadowColor.withValues(alpha: 0.1),
                         blurRadius: 8,
                         spreadRadius: 1,
                         offset: const Offset(0, 2),
@@ -461,13 +497,16 @@ class HomePageState extends State<HomePage> {
                               onTap: () {
                                 _scaffoldKey.currentState?.openDrawer();
                               },
-                              child: const Icon(Icons.menu),
+                              child: Icon(
+                                Icons.menu,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Text(
                               'Traffix',
                               style: TextStyle(
-                                color: Colors.blue,
+                                color: Theme.of(context).colorScheme.primary,
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -482,26 +521,46 @@ class HomePageState extends State<HomePage> {
                         ),
                         decoration: BoxDecoration(
                           border: Border(
-                            top: BorderSide(color: Colors.grey.shade200),
+                            top: BorderSide(
+                              color: Theme.of(context).dividerColor,
+                            ),
                           ),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.search, color: Colors.grey.shade600),
+                            Icon(
+                              Icons.search,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: .6),
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: TextField(
                                 controller: _searchController,
                                 onChanged: _onSearchChanged,
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
                                 decoration: InputDecoration(
-                                  hintText: 'Search for a destination',
+                                  hintText: 'Search for a destination.....',
                                   hintStyle: TextStyle(
-                                    color: Colors.grey.shade400,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: .4),
+                                    fontSize: 16,
                                   ),
                                   border: InputBorder.none,
                                   isDense: true,
-                                  contentPadding: EdgeInsets.zero,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   suffixIcon: _buildSuffixIcon(),
+                                  fillColor:
+                                      Theme.of(context).colorScheme.surface,
+                                  filled: true,
                                 ),
                               ),
                             ),
@@ -515,7 +574,9 @@ class HomePageState extends State<HomePage> {
                           ),
                           decoration: BoxDecoration(
                             border: Border(
-                              top: BorderSide(color: Colors.grey.shade200),
+                              top: BorderSide(
+                                color: Theme.of(context).dividerColor,
+                              ),
                             ),
                           ),
                           child: SingleChildScrollView(
@@ -535,7 +596,10 @@ class HomePageState extends State<HomePage> {
                                           children: [
                                             Icon(
                                               Icons.location_on,
-                                              color: Colors.grey.shade700,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: .6),
                                             ),
                                             const SizedBox(width: 16),
                                             Expanded(
@@ -545,17 +609,25 @@ class HomePageState extends State<HomePage> {
                                                 children: [
                                                   Text(
                                                     result.name,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.w500,
+                                                      color:
+                                                          Theme.of(context)
+                                                              .colorScheme
+                                                              .onSurface,
                                                     ),
                                                   ),
                                                   const SizedBox(height: 2),
                                                   Text(
                                                     result.address,
                                                     style: TextStyle(
-                                                      color:
-                                                          Colors.grey.shade600,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: .6,
+                                                          ),
                                                       fontSize: 13,
                                                     ),
                                                     maxLines: 1,
@@ -582,31 +654,30 @@ class HomePageState extends State<HomePage> {
           Positioned(
             left: 16,
             bottom: 100,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: .1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
               child: Column(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.my_location),
+                    icon: Icon(
+                      Icons.my_location,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                     onPressed: () {
                       if (_currentPosition != null) {
                         _mapController.move(_currentPosition!, 18);
                       }
                     },
                   ),
-                  Container(height: 1, color: Colors.grey.shade400),
+                  Divider(height: 1, color: Theme.of(context).dividerColor),
                   IconButton(
-                    icon: const Icon(Icons.add),
+                    icon: Icon(
+                      Icons.add,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                     onPressed: () {
                       final currentZoom = _mapController.camera.zoom;
                       _mapController.move(
@@ -615,9 +686,12 @@ class HomePageState extends State<HomePage> {
                       );
                     },
                   ),
-                  Container(height: 1, color: Colors.grey.shade400),
+                  Divider(height: 1, color: Theme.of(context).dividerColor),
                   IconButton(
-                    icon: const Icon(Icons.remove),
+                    icon: Icon(
+                      Icons.remove,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                     onPressed: () {
                       final currentZoom = _mapController.camera.zoom;
                       _mapController.move(
@@ -637,8 +711,11 @@ class HomePageState extends State<HomePage> {
         children: [
           FloatingActionButton(
             onPressed: () => _showIncidentDialog(context),
-            backgroundColor: Colors.red,
-            child: const Icon(Icons.report_problem),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            child: Icon(
+              Icons.report_problem,
+              color: Theme.of(context).colorScheme.onError,
+            ),
           ),
         ],
       ),

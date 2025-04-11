@@ -206,6 +206,7 @@ class _SignupPageState extends State<SignupPage> {
                       TextField(
                         controller: nameController,
                         decoration: InputDecoration(
+                          labelText: 'Full Name',
                           hintText: 'Enter your full name',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],
@@ -238,6 +239,7 @@ class _SignupPageState extends State<SignupPage> {
                       TextField(
                         controller: emailController,
                         decoration: InputDecoration(
+                          labelText: 'Email',
                           hintText: 'Enter your email',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],
@@ -271,6 +273,7 @@ class _SignupPageState extends State<SignupPage> {
                         controller: passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
+                          labelText: 'Password',
                           hintText: 'Create a password',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],
@@ -317,6 +320,7 @@ class _SignupPageState extends State<SignupPage> {
                         controller: confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
                         decoration: InputDecoration(
+                          labelText: 'Confirm Password',
                           hintText: 'Confirm your password',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],

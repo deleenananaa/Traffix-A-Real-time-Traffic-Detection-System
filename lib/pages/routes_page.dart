@@ -5,7 +5,9 @@ import 'package:latlong2/latlong.dart' as latlong;
 import '../services/map_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
-import 'package:graphhooper_route_navigation/graphhooper_route_navigation.dart';
+import 'package:routing_client_dart/routing_client_dart.dart' as routing;
+import 'dart:math';
+import 'package:logger/logger.dart';
 
 class RoutesPage extends StatefulWidget {
   const RoutesPage({super.key});
@@ -15,6 +17,7 @@ class RoutesPage extends StatefulWidget {
 }
 
 class _RoutesPageState extends State<RoutesPage> {
+  final _logger = Logger();
   // Add this variable to track selected index
   int _selectedIndex = 1;
   final flutter_map.MapController _mapController = flutter_map.MapController();
@@ -31,7 +34,14 @@ class _RoutesPageState extends State<RoutesPage> {
   Timer? _startDebounce;
   Timer? _endDebounce;
   StreamSubscription<Position>? _locationSubscription;
-  final ApiRequest _apiRequest = ApiRequest();
+  final manager = routing.RoutingManager();
+
+  // Add these new state variables
+  bool _isNavigating = false;
+  List<routing.RouteInstruction>? _instructions;
+  int _currentInstructionIndex = 0;
+  Timer? _navigationTimer;
+  routing.Route? _currentRoad;
 
   @override
   void initState() {
@@ -47,6 +57,7 @@ class _RoutesPageState extends State<RoutesPage> {
     _startDebounce?.cancel();
     _endDebounce?.cancel();
     _locationSubscription?.cancel();
+    _navigationTimer?.cancel();
     super.dispose();
   }
 
@@ -216,35 +227,120 @@ class _RoutesPageState extends State<RoutesPage> {
     }
 
     try {
-      final directionRouteResponse = await _apiRequest
-          .getDrivingRouteUsingGraphHooper(
-            source: LatLng(_startLocation!.latitude, _startLocation!.longitude),
-            destination: LatLng(
-              _endLocation!.latitude,
-              _endLocation!.longitude,
-            ),
-            graphHooperApiKey: "4428d23a-1fa5-4d94-9409-7d87dd50c132",
-            navigationType: NavigationProfile.car,
-          );
+      List<routing.LngLat> waypoints = [
+        routing.LngLat(
+          lng: _startLocation!.longitude,
+          lat: _startLocation!.latitude,
+        ),
+        routing.LngLat(
+          lng: _endLocation!.longitude,
+          lat: _endLocation!.latitude,
+        ),
+      ];
+
+      // Use OSRM trip service with specific options
+      final road = await manager.getRoute(
+        request: routing.OSRMRequest.trip(
+          waypoints: waypoints,
+          destination: routing.DestinationGeoPointOption.last,
+          source: routing.SourceGeoPointOption.first,
+          geometries: routing.Geometries.polyline,
+          steps: true, // Get turn-by-turn instructions
+          languages: routing.Languages.en,
+          roundTrip: false, // We want a one-way trip
+          overview: routing.Overview.full, // Get full geometry
+        ),
+      );
 
       if (!mounted) return;
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => NavigationWrapperScreen(
-                directionRouteResponse: directionRouteResponse,
-              ),
-        ),
+      setState(() {
+        _currentRoad = road;
+        _instructions = road.instructions;
+        _isNavigating = true;
+        _currentInstructionIndex = 0;
+      });
+
+      // Start periodic location checks for navigation updates
+      _navigationTimer?.cancel();
+      _navigationTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => _checkCurrentInstruction(),
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error starting navigation: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error calculating route: $e')));
       }
     }
+  }
+
+  Future<void> _checkCurrentInstruction() async {
+    if (_currentRoad == null || _instructions == null || !_isNavigating) return;
+
+    if (_currentLocation != null) {
+      final currentLngLat = routing.LngLat(
+        lng: _currentLocation!.longitude,
+        lat: _currentLocation!.latitude,
+      );
+
+      try {
+        // Calculate distance to next instruction
+        final currentInstruction = _instructions![_currentInstructionIndex];
+
+        // Simple distance-based check (can be made more sophisticated)
+        final distanceToNextStep = _calculateDistance(
+          currentLngLat.lat,
+          currentLngLat.lng,
+          currentInstruction.location.lat,
+          currentInstruction.location.lng,
+        );
+
+        if (distanceToNextStep < 20 && // Within 20 meters
+            _currentInstructionIndex < _instructions!.length - 1) {
+          setState(() {
+            _currentInstructionIndex++;
+          });
+        }
+      } catch (e) {
+        _logger.e('Error updating instruction', error: e);
+      }
+    }
+  }
+
+  // Helper method to calculate distance between two points
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const double earthRadius = 6371000; // meters
+    final double dLat = _toRadians(lat2 - lat1);
+    final double dLon = _toRadians(lon2 - lon1);
+    final double a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(lat1)) *
+            cos(_toRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  double _toRadians(double degree) {
+    return degree * pi / 180;
+  }
+
+  void _stopNavigation() {
+    setState(() {
+      _isNavigating = false;
+      _instructions = null;
+      _currentInstructionIndex = 0;
+      _currentRoad = null;
+    });
+    _navigationTimer?.cancel();
   }
 
   void _onItemTapped(int index) {
@@ -271,20 +367,32 @@ class _RoutesPageState extends State<RoutesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Routes'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'Alerts',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.phone), label: 'Emergency'),
-        ],
-      ),
+      bottomNavigationBar:
+          _isNavigating
+              ? null
+              : BottomNavigationBar(
+                currentIndex: _selectedIndex,
+                onTap: _onItemTapped,
+                type: BottomNavigationBarType.fixed,
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.map),
+                    label: 'Routes',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.notifications),
+                    label: 'Alerts',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.phone),
+                    label: 'Emergency',
+                  ),
+                ],
+              ),
       body: Stack(
         children: [
           flutter_map.FlutterMap(
@@ -343,123 +451,263 @@ class _RoutesPageState extends State<RoutesPage> {
                 ),
             ],
           ),
-          // Search panel
-          Positioned(
-            top: MediaQuery.of(context).padding.top,
-            left: 0,
-            right: 0,
-            child: Container(
-              color: Colors.white,
-              child: Column(
-                children: [
-                  // Start location search
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextField(
-                      controller: _startController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter start location',
-                        prefixIcon: const Icon(
-                          Icons.location_on,
-                          color: Colors.green,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+          // Add map controls- Only show when not navigating
+          if (!_isNavigating)
+            Positioned(
+              left: 16,
+              bottom: 100,
+              child: Card(
+                child: Column(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.my_location),
+                      onPressed: () {
+                        if (_currentLocation != null) {
+                          _mapController.move(_currentLocation!, 18);
+                        }
+                      },
                     ),
-                  ),
-                  if (_startSearchResults.isNotEmpty)
-                    Container(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.2,
-                      ),
-                      color: Colors.white,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _startSearchResults.length,
-                        itemBuilder: (context, index) {
-                          final result = _startSearchResults[index];
-                          return ListTile(
-                            title: Text(result.name),
-                            subtitle: Text(result.address),
-                            onTap: () => _onStartLocationSelected(result),
-                          );
-                        },
-                      ),
+                    Container(height: 1, color: Colors.grey.shade400),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: () {
+                        final currentZoom = _mapController.camera.zoom;
+                        _mapController.move(
+                          _mapController.camera.center,
+                          currentZoom + 1,
+                        );
+                      },
                     ),
-                  // End location search
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextField(
-                      controller: _endController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter destination',
-                        prefixIcon: const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+                    Container(height: 1, color: Colors.grey.shade400),
+                    IconButton(
+                      icon: const Icon(Icons.remove),
+                      onPressed: () {
+                        final currentZoom = _mapController.camera.zoom;
+                        _mapController.move(
+                          _mapController.camera.center,
+                          currentZoom - 1,
+                        );
+                      },
                     ),
-                  ),
-                  if (_endSearchResults.isNotEmpty)
-                    Container(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.2,
-                      ),
-                      color: Colors.white,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _endSearchResults.length,
-                        itemBuilder: (context, index) {
-                          final result = _endSearchResults[index];
-                          return ListTile(
-                            title: Text(result.name),
-                            subtitle: Text(result.address),
-                            onTap: () => _onEndLocationSelected(result),
-                          );
-                        },
-                      ),
-                    ),
-                  // Find route and Start Navigation buttons
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _findRoute,
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(50),
-                            ),
-                            child:
-                                _isLoading
-                                    ? const CircularProgressIndicator()
-                                    : const Text('Find Route'),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed:
-                                _routeResult == null ? null : _startNavigation,
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(50),
-                              backgroundColor: Colors.green,
-                            ),
-                            child: const Text('Start Navigation'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+
+          // Search panel - Only show when not navigating
+          if (!_isNavigating)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 20,
+              right: 20,
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Start location search
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: TextField(
+                          controller: _startController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter start location',
+                            prefixIcon: const Icon(
+                              Icons.location_on,
+                              color: Colors.green,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_startSearchResults.isNotEmpty)
+                        Container(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.2,
+                          ),
+                          color: Colors.white,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _startSearchResults.length,
+                            itemBuilder: (context, index) {
+                              final result = _startSearchResults[index];
+                              return ListTile(
+                                title: Text(result.name),
+                                subtitle: Text(result.address),
+                                onTap: () => _onStartLocationSelected(result),
+                              );
+                            },
+                          ),
+                        ),
+                      // End location search
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: TextField(
+                          controller: _endController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter destination',
+                            prefixIcon: const Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_endSearchResults.isNotEmpty)
+                        Container(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.2,
+                          ),
+                          color: Colors.white,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _endSearchResults.length,
+                            itemBuilder: (context, index) {
+                              final result = _endSearchResults[index];
+                              return ListTile(
+                                title: Text(result.name),
+                                subtitle: Text(result.address),
+                                onTap: () => _onEndLocationSelected(result),
+                              );
+                            },
+                          ),
+                        ),
+                      // Find route and Start Navigation buttons
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _findRoute,
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40),
+                                ),
+                                child:
+                                    _isLoading
+                                        ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                        : const Text('Find Route'),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed:
+                                    _routeResult == null
+                                        ? null
+                                        : _startNavigation,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40),
+                                ),
+                                child: const Text('Start Navigation'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Add navigation panel when navigating
+          if (_isNavigating && _instructions != null)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Current instruction
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.blue.shade50,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _instructions![_currentInstructionIndex]
+                                      .instruction,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'In ${(_instructions![_currentInstructionIndex].distance / 1000).toStringAsFixed(1)} km',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            onPressed: _stopNavigation,
+                            tooltip: 'Stop Navigation',
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Next instruction preview
+                    if (_currentInstructionIndex < _instructions!.length - 1)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.arrow_forward, color: Colors.grey),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _instructions![_currentInstructionIndex + 1]
+                                    .instruction,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
