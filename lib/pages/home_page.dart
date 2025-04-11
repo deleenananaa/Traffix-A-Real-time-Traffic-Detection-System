@@ -329,22 +329,17 @@ class HomePageState extends State<HomePage> {
         child: Column(
           children: [
             DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  const CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 35, color: Colors.blue),
+                  const Icon(
+                    Icons.directions_car_rounded,
+                    size: 70,
+                    color: Colors.blue,
                   ),
-                  const SizedBox(height: 10),
                   Text(
-                    user?.email ?? 'User',
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    'Traffix',
+                    style: const TextStyle(color: Colors.blue, fontSize: 20),
                   ),
-                  const SizedBox(height: 5),
                 ],
               ),
             ),

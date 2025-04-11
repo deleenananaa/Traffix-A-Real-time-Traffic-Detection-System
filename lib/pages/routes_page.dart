@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart' as flutter_map;
+import 'package:latlong2/latlong.dart' as latlong;
 import '../services/map_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
+import 'package:routing_client_dart/routing_client_dart.dart' as routing;
+import 'dart:math';
+import 'package:logger/logger.dart';
 
 class RoutesPage extends StatefulWidget {
   const RoutesPage({super.key});
@@ -14,15 +17,16 @@ class RoutesPage extends StatefulWidget {
 }
 
 class _RoutesPageState extends State<RoutesPage> {
+  final _logger = Logger();
   // Add this variable to track selected index
   int _selectedIndex = 1;
-  final MapController _mapController = MapController();
+  final flutter_map.MapController _mapController = flutter_map.MapController();
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _endController = TextEditingController();
 
-  LatLng? _currentLocation;
-  LatLng? _startLocation;
-  LatLng? _endLocation;
+  latlong.LatLng? _currentLocation;
+  latlong.LatLng? _startLocation;
+  latlong.LatLng? _endLocation;
   List<SearchResult> _startSearchResults = [];
   List<SearchResult> _endSearchResults = [];
   RouteResult? _routeResult;
@@ -30,6 +34,14 @@ class _RoutesPageState extends State<RoutesPage> {
   Timer? _startDebounce;
   Timer? _endDebounce;
   StreamSubscription<Position>? _locationSubscription;
+  final manager = routing.RoutingManager();
+
+  // Add these new state variables
+  bool _isNavigating = false;
+  List<routing.RouteInstruction>? _instructions;
+  int _currentInstructionIndex = 0;
+  Timer? _navigationTimer;
+  routing.Route? _currentRoad;
 
   @override
   void initState() {
@@ -45,6 +57,7 @@ class _RoutesPageState extends State<RoutesPage> {
     _startDebounce?.cancel();
     _endDebounce?.cancel();
     _locationSubscription?.cancel();
+    _navigationTimer?.cancel();
     super.dispose();
   }
 
@@ -52,7 +65,10 @@ class _RoutesPageState extends State<RoutesPage> {
     try {
       final position = await MapService.getCurrentLocation();
       setState(() {
-        _currentLocation = LatLng(position.latitude, position.longitude);
+        _currentLocation = latlong.LatLng(
+          position.latitude,
+          position.longitude,
+        );
       });
 
       _mapController.move(_currentLocation!, 15);
@@ -60,7 +76,10 @@ class _RoutesPageState extends State<RoutesPage> {
       // Start listening to location updates
       _locationSubscription = MapService.getLocationStream().listen((position) {
         setState(() {
-          _currentLocation = LatLng(position.latitude, position.longitude);
+          _currentLocation = latlong.LatLng(
+            position.latitude,
+            position.longitude,
+          );
         });
       });
     } catch (e) {
@@ -138,9 +157,15 @@ class _RoutesPageState extends State<RoutesPage> {
 
   void _updateMapView() {
     if (_startLocation != null && _endLocation != null) {
-      final bounds = LatLngBounds.fromPoints([_startLocation!, _endLocation!]);
+      final bounds = flutter_map.LatLngBounds.fromPoints([
+        _startLocation!,
+        _endLocation!,
+      ]);
       _mapController.fitCamera(
-        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+        flutter_map.CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(50.0),
+        ),
       );
     } else if (_startLocation != null) {
       _mapController.move(_startLocation!, 15);
@@ -171,9 +196,12 @@ class _RoutesPageState extends State<RoutesPage> {
       });
 
       if (route.points.isNotEmpty) {
-        final bounds = LatLngBounds.fromPoints(route.points);
+        final bounds = flutter_map.LatLngBounds.fromPoints(route.points);
         _mapController.fitCamera(
-          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+          flutter_map.CameraFit.bounds(
+            bounds: bounds,
+            padding: const EdgeInsets.all(50.0),
+          ),
         );
       }
     } catch (e) {
@@ -186,6 +214,133 @@ class _RoutesPageState extends State<RoutesPage> {
         ).showSnackBar(SnackBar(content: Text('Error finding route: $e')));
       }
     }
+  }
+
+  Future<void> _startNavigation() async {
+    if (_startLocation == null || _endLocation == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select both start and end locations'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      List<routing.LngLat> waypoints = [
+        routing.LngLat(
+          lng: _startLocation!.longitude,
+          lat: _startLocation!.latitude,
+        ),
+        routing.LngLat(
+          lng: _endLocation!.longitude,
+          lat: _endLocation!.latitude,
+        ),
+      ];
+
+      // Use OSRM trip service with specific options
+      final road = await manager.getRoute(
+        request: routing.OSRMRequest.trip(
+          waypoints: waypoints,
+          destination: routing.DestinationGeoPointOption.last,
+          source: routing.SourceGeoPointOption.first,
+          geometries: routing.Geometries.polyline,
+          steps: true, // Get turn-by-turn instructions
+          languages: routing.Languages.en,
+          roundTrip: false, // We want a one-way trip
+          overview: routing.Overview.full, // Get full geometry
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentRoad = road;
+        _instructions = road.instructions;
+        _isNavigating = true;
+        _currentInstructionIndex = 0;
+      });
+
+      // Start periodic location checks for navigation updates
+      _navigationTimer?.cancel();
+      _navigationTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => _checkCurrentInstruction(),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error calculating route: $e')));
+      }
+    }
+  }
+
+  Future<void> _checkCurrentInstruction() async {
+    if (_currentRoad == null || _instructions == null || !_isNavigating) return;
+
+    if (_currentLocation != null) {
+      final currentLngLat = routing.LngLat(
+        lng: _currentLocation!.longitude,
+        lat: _currentLocation!.latitude,
+      );
+
+      try {
+        // Calculate distance to next instruction
+        final currentInstruction = _instructions![_currentInstructionIndex];
+
+        // Simple distance-based check (can be made more sophisticated)
+        final distanceToNextStep = _calculateDistance(
+          currentLngLat.lat,
+          currentLngLat.lng,
+          currentInstruction.location.lat,
+          currentInstruction.location.lng,
+        );
+
+        if (distanceToNextStep < 20 && // Within 20 meters
+            _currentInstructionIndex < _instructions!.length - 1) {
+          setState(() {
+            _currentInstructionIndex++;
+          });
+        }
+      } catch (e) {
+        _logger.e('Error updating instruction', error: e);
+      }
+    }
+  }
+
+  // Helper method to calculate distance between two points
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const double earthRadius = 6371000; // meters
+    final double dLat = _toRadians(lat2 - lat1);
+    final double dLon = _toRadians(lon2 - lon1);
+    final double a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(lat1)) *
+            cos(_toRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  double _toRadians(double degree) {
+    return degree * pi / 180;
+  }
+
+  void _stopNavigation() {
+    setState(() {
+      _isNavigating = false;
+      _instructions = null;
+      _currentInstructionIndex = 0;
+      _currentRoad = null;
+    });
+    _navigationTimer?.cancel();
   }
 
   void _onItemTapped(int index) {
@@ -212,27 +367,39 @@ class _RoutesPageState extends State<RoutesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Routes'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'Alerts',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.phone), label: 'Emergency'),
-        ],
-      ),
+      bottomNavigationBar:
+          _isNavigating
+              ? null
+              : BottomNavigationBar(
+                currentIndex: _selectedIndex,
+                onTap: _onItemTapped,
+                type: BottomNavigationBarType.fixed,
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.map),
+                    label: 'Routes',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.notifications),
+                    label: 'Alerts',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.phone),
+                    label: 'Emergency',
+                  ),
+                ],
+              ),
       body: Stack(
         children: [
-          FlutterMap(
+          flutter_map.FlutterMap(
             mapController: _mapController,
             options: MapService.defaultMapOptions,
             children: [
-              TileLayer(urlTemplate: MapService.getTileLayer()),
+              flutter_map.TileLayer(urlTemplate: MapService.getTileLayer()),
               // Current location marker
               CurrentLocationLayer(
                 style: const LocationMarkerStyle(
@@ -245,10 +412,10 @@ class _RoutesPageState extends State<RoutesPage> {
                 ),
               ),
               // Start and end location markers
-              MarkerLayer(
+              flutter_map.MarkerLayer(
                 markers: [
                   if (_startLocation != null)
-                    Marker(
+                    flutter_map.Marker(
                       point: _startLocation!,
                       width: 40,
                       height: 40,
@@ -259,7 +426,7 @@ class _RoutesPageState extends State<RoutesPage> {
                       ),
                     ),
                   if (_endLocation != null)
-                    Marker(
+                    flutter_map.Marker(
                       point: _endLocation!,
                       width: 40,
                       height: 40,
@@ -273,9 +440,9 @@ class _RoutesPageState extends State<RoutesPage> {
               ),
               // Route polyline
               if (_routeResult != null)
-                PolylineLayer(
+                flutter_map.PolylineLayer(
                   polylines: [
-                    Polyline(
+                    flutter_map.Polyline(
                       points: _routeResult!.points,
                       strokeWidth: 4,
                       color: Colors.blue,
@@ -365,24 +532,108 @@ class _RoutesPageState extends State<RoutesPage> {
                         },
                       ),
                     ),
-                  // Find route button
+                  // Find route and Start Navigation buttons
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _findRoute,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      child:
-                          _isLoading
-                              ? const CircularProgressIndicator()
-                              : const Text('Find Route'),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _findRoute,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(50),
+                            ),
+                            child:
+                                _isLoading
+                                    ? const CircularProgressIndicator()
+                                    : const Text('Find Route'),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed:
+                                _routeResult == null ? null : _startNavigation,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(50),
+                              backgroundColor: Colors.green,
+                            ),
+                            child: const Text('Start Navigation'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
+          // Add navigation panel when navigating
+          if (_isNavigating && _instructions != null)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Current instruction
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.blue.shade50,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _instructions![_currentInstructionIndex]
+                                      .instruction,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'In ${(_instructions![_currentInstructionIndex].distance / 1000).toStringAsFixed(1)} km',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: _stopNavigation,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Next instruction preview
+                    if (_currentInstructionIndex < _instructions!.length - 1)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.arrow_forward, color: Colors.grey),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _instructions![_currentInstructionIndex + 1]
+                                    .instruction,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
