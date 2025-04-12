@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:traffix/theme/theme_provider.dart';
+import 'pdf_viewer_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -9,6 +11,8 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     // Get the theme provider
     final themeProvider = Provider.of<ThemeProvider>(context);
+    // Get the current user
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       body: SafeArea(
@@ -88,9 +92,9 @@ class ProfilePage extends StatelessWidget {
                     ),
 
                     // Name
-                    const Text(
-                      'User',
-                      style: TextStyle(
+                    Text(
+                      user?.displayName ?? '',
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
@@ -100,7 +104,7 @@ class ProfilePage extends StatelessWidget {
 
                     // Email
                     Text(
-                      'user@gmail.com',
+                      user?.email ?? '',
                       style: TextStyle(
                         fontSize: 16,
                         color: Theme.of(
@@ -161,7 +165,16 @@ class ProfilePage extends StatelessWidget {
                                 ),
                                 title: const Text('Traffic Analysis'),
                                 onTap: () {
-                                  // Handle traffic analysis
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => const PDFViewerPage(
+                                            filePath:
+                                                'assets/pdf/TrafficAnalysis.pdf',
+                                          ),
+                                    ),
+                                  );
                                 },
                               ),
                               Divider(
@@ -225,8 +238,28 @@ class ProfilePage extends StatelessWidget {
                                     context,
                                   ).colorScheme.onSurface.withValues(alpha: .6),
                                 ),
-                                onTap: () {
-                                  // Handle logout
+                                onTap: () async {
+                                  try {
+                                    await FirebaseAuth.instance.signOut();
+                                    if (context.mounted) {
+                                      Navigator.pushReplacementNamed(
+                                        context,
+                                        '/login',
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Error signing out: $e',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
                                 },
                               ),
                             ],

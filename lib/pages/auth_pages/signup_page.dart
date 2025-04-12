@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:logger/logger.dart';
 
 class SignupPage extends StatefulWidget {
   final Function()? onTap;
@@ -17,6 +18,7 @@ class _SignupPageState extends State<SignupPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
+  final logger = Logger();
 
   // For password visibility toggle
   bool _obscurePassword = true;
@@ -74,6 +76,8 @@ class _SignupPageState extends State<SignupPage> {
 
   // sign up function
   void signUserUp() async {
+    if (!mounted) return;
+
     // Check if terms are agreed to
     if (!_agreeToTerms) {
       showErrorMessage('Please agree to the Terms & Conditions');
@@ -94,8 +98,10 @@ class _SignupPageState extends State<SignupPage> {
     }
 
     // show loading circle
+    if (!mounted) return;
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return const Center(child: CircularProgressIndicator());
       },
@@ -105,32 +111,88 @@ class _SignupPageState extends State<SignupPage> {
     try {
       if (passwordController.text == confirmPasswordController.text) {
         // Create the user
-        UserCredential userCredential = await FirebaseAuth.instance
+        logger.i(
+          'Attempting to create user with email: ${emailController.text.trim()}',
+        );
+
+        final userCredential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(
               email: emailController.text.trim(),
               password: passwordController.text,
             );
 
-        // Update display name
-        await userCredential.user?.updateDisplayName(nameController.text);
+        logger.i('User credential received: ${userCredential.user?.uid}');
 
-        // hide loading circle
-        if (mounted) Navigator.pop(context);
+        if (userCredential.user != null) {
+          logger.i(
+            'User created successfully with UID: ${userCredential.user!.uid}',
+          );
+          // Update display name
+          try {
+            await userCredential.user!.updateDisplayName(
+              nameController.text.trim(),
+            );
+            logger.i('Display name updated successfully');
+            // Reload user to ensure the display name is updated
+            await userCredential.user!.reload();
+            logger.i('User reloaded successfully');
+
+            // Verify the user is actually created
+            final currentUser = FirebaseAuth.instance.currentUser;
+            logger.i('Current user after signup: ${currentUser?.uid}');
+            logger.i('Current user email: ${currentUser?.email}');
+            logger.i('Current user display name: ${currentUser?.displayName}');
+
+            if (!mounted) return;
+            Navigator.of(context).pop(); // Remove loading dialog
+
+            // Show success message and navigate
+            if (!mounted) return;
+            await showDialog(
+              context: context,
+              builder:
+                  (context) => AlertDialog(
+                    title: const Text('Success'),
+                    content: const Text('Account created successfully!'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          if (widget.onTap != null) {
+                            widget.onTap!();
+                          }
+                        },
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+            );
+          } catch (e) {
+            logger.e('Error updating display name: $e');
+            if (!mounted) return;
+            Navigator.of(context).pop(); // Remove loading dialog
+            showErrorMessage('Failed to update profile. Please try again.');
+          }
+        } else {
+          logger.e('User creation failed: userCredential.user is null');
+          if (!mounted) return;
+          Navigator.of(context).pop(); // Remove loading dialog
+          showErrorMessage('Failed to create account. Please try again.');
+        }
       } else {
-        // hide loading circle
-        if (mounted) Navigator.pop(context);
-        // show error message that passwords don't match
+        if (!mounted) return;
+        Navigator.of(context).pop(); // Remove loading dialog
         showErrorMessage('Passwords do not match!');
       }
     } on FirebaseAuthException catch (e) {
-      // hide loading circle
-      if (mounted) Navigator.pop(context);
-      // show error message
+      logger.e('FirebaseAuthException during signup: ${e.code} - ${e.message}');
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Remove loading dialog
       showErrorMessage(e.code);
     } catch (e) {
-      // hide loading circle
-      if (mounted) Navigator.pop(context);
-      // show generic error message
+      logger.e('Unexpected error during signup: $e');
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Remove loading dialog
       showErrorMessage('An unexpected error occurred. Please try again.');
     }
   }

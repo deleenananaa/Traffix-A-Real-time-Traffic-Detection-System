@@ -93,6 +93,12 @@ class _RoutesPageState extends State<RoutesPage> {
 
   void _setupSearchListeners() {
     _startController.addListener(() {
+      if (_startController.text.isEmpty) {
+        setState(() {
+          _startSearchResults = [];
+        });
+        return;
+      }
       _startDebounce?.cancel();
       _startDebounce = Timer(const Duration(milliseconds: 500), () {
         _searchLocation(_startController.text, true);
@@ -100,6 +106,12 @@ class _RoutesPageState extends State<RoutesPage> {
     });
 
     _endController.addListener(() {
+      if (_endController.text.isEmpty) {
+        setState(() {
+          _endSearchResults = [];
+        });
+        return;
+      }
       _endDebounce?.cancel();
       _endDebounce = Timer(const Duration(milliseconds: 500), () {
         _searchLocation(_endController.text, false);
@@ -142,6 +154,7 @@ class _RoutesPageState extends State<RoutesPage> {
       _startLocation = result.position;
       _startController.text = result.address;
       _startSearchResults = [];
+      _endSearchResults = [];
     });
     _updateMapView();
   }
@@ -151,6 +164,7 @@ class _RoutesPageState extends State<RoutesPage> {
       _endLocation = result.position;
       _endController.text = result.address;
       _endSearchResults = [];
+      _startSearchResults = [];
     });
     _updateMapView();
   }

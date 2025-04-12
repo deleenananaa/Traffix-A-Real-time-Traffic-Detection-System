@@ -40,6 +40,8 @@ dependencies:
   firebase_database: ^11.3.5
   google_sign_in: ^6.3.0
   collection: ^1.19.1
+  path_provider: ^2.1.5
+  path: ^1.8.3
 
   #OpenStreetMap
   flutter_map: ^8.1.1
@@ -53,6 +55,9 @@ dependencies:
 
   #theme
   flex_color_scheme: ^8.2.0
+
+  flutter_pdfview: ^1.4.0
+  permission_handler: ^12.0.0
 
   #phone call
   url_launcher: ^6.3.1
@@ -89,6 +94,7 @@ flutter:
   assets:
     - assets/images/facebook.png
     - assets/images/google.png
+    - assets/pdf/TrafficAnalysis.pdf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -190,10 +190,29 @@ class HomePageState extends State<HomePage> {
   }
 
   void signUserOut() async {
-    await FirebaseAuth.instance.signOut();
+    try {
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error signing out: $e')));
+      }
+    }
   }
 
   void _onSearchChanged(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
     if (_debounce?.isActive ?? false) _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       if (query.isNotEmpty) {
@@ -202,25 +221,22 @@ class HomePageState extends State<HomePage> {
         });
         try {
           final results = await MapService.searchLocation(query);
-          setState(() {
-            _searchResults = results;
-            _isSearching = false;
-          });
-        } catch (e) {
-          setState(() {
-            _isSearching = false;
-          });
           if (mounted) {
+            setState(() {
+              _searchResults = results;
+              _isSearching = false;
+            });
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _isSearching = false;
+            });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Error searching location: $e')),
             );
           }
         }
-      } else {
-        setState(() {
-          _searchResults = [];
-          _isSearching = false;
-        });
       }
     });
   }
@@ -230,6 +246,7 @@ class HomePageState extends State<HomePage> {
     setState(() {
       _searchResults = [];
       _searchController.text = result.address;
+      _isSearching = false;
     });
   }
 
