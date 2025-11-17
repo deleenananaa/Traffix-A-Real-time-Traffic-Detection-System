@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter/material.dart';
 
 class TomTomService {
-  static const String apiKey = 'qtP5UjXyzP4HHYqeflA7kChZ3dtZKh7W';
+  static const String apiKey = 'your-tomtom-apikey';
   static const String trafficUrl = 'https://api.tomtom.com/traffic/1';
 
   // Kathmandu Valley bounding box coordinates
